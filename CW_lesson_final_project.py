@@ -1,0 +1,70 @@
+import cv2
+import os
+import yt_dlp
+from ultralytics import YOLO
+
+PROJECT_DIR = os.path.dirname(__file__)
+# VIDEO_DIR = os.path.join()
+
+YOUTUBE = 'https://www.youtube.com/watch?v=M3EYAY2MftI'
+MODEL_PATH = 'yolo26m.pt'
+
+track_histoy = {}
+PPM = 8
+
+def get_stream_url(url):
+    ydl_opts = {
+        'format': 'bestvideo[height<=480][ext=mp4]/best[height<=480]/worst',
+        'quiet': True,
+        'no_warnings': True,
+    }
+    print(f"📡 З'єднання з YouTube через yt-dlp...")
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            return info['url']
+    except Exception as e:
+        print(f" Помилка: {e}")
+        return None
+
+model = YOLO(MODEL_PATH)
+stream = get_stream_url(YOUTUBE)
+if not stream:
+    exit()
+
+cap = cv2.VideoCapture(stream)
+
+frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+fps = cap.get(cv2.CAP_PROP_FPS)
+
+frame_count = 0
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    result = model.track(frame, classes = [2], conf = 0.2, verbose = False)
+    if result[0].boxes.id is not None:
+        boxes = result[0].boxes.xywh.cpu().numpy()
+        track_ids = result[0].boxes.id.int().cpu().tolist()
+
+        for box, track_id in zip(boxes, track_ids):
+            x, y, w, h = box
+
+
+            if track_id in track_histoy:
+                prev_x, prev_y = track_histoy[track_id]
+                dist_pix = ((x-prev_x)**2 + (y-prev_y)**2)**0.5
+                speed_m = (dist_pix / PPM) * fps
+                speed_km = speed_m * 3.6
+
+    car_frame = result[0].plot()
+
+    frame_count -= 1
+    cv2.imshow('land of tea', car_frame)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
