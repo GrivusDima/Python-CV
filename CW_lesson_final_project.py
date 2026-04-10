@@ -9,7 +9,7 @@ PROJECT_DIR = os.path.dirname(__file__)
 YOUTUBE = 'https://www.youtube.com/watch?v=M3EYAY2MftI'
 MODEL_PATH = 'yolo26m.pt'
 
-track_histoy = {}
+track_history = {}
 PPM = 8
 
 def get_stream_url(url):
@@ -53,11 +53,15 @@ while True:
             x, y, w, h = box
 
 
-            if track_id in track_histoy:
-                prev_x, prev_y = track_histoy[track_id]
+            if track_id in track_history:
+                prev_x, prev_y = track_history[track_id]
                 dist_pix = ((x-prev_x)**2 + (y-prev_y)**2)**0.5
                 speed_m = (dist_pix / PPM) * fps
                 speed_km = speed_m * 3.6
+
+                cv2.putText(frame, f'id: {track_id}, speed: {int(speed_km)} km/h', (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+            track_history[track_id] = (x, y)
 
     car_frame = result[0].plot()
 
